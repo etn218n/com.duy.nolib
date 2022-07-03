@@ -1,0 +1,16 @@
+{
+    "name": "Node",
+    "rootNamespace": "",
+    "references": [
+        "GUID:a852dc45ef8d1384a943ac85593f69c4"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

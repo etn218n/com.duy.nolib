@@ -1,0 +1,19 @@
+{
+  "name": "com.duy.nolib",
+  "version": "1.0.0",
+  "displayName": "Nolib",
+  "description": "General purpose library in Unity",
+  "unity": "2021.3",
+  "unityRelease": "5f1",
+  "documentationUrl": "",
+  "changelogUrl": "",
+  "licensesUrl": "",
+  "dependencies": {},
+  "keywords": [
+  ],
+  "author": {
+    "name": "Duy",
+    "email": "etn218n@gmail.com",
+    "url": "https://github.com/etn218n"
+  }
+}
