@@ -1,6 +1,6 @@
 {
   "name": "com.duy.nolib",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "displayName": "Nolib",
   "description": "General purpose library in Unity",
   "unity": "2021.3",

@@ -114,7 +114,7 @@ namespace Nolib.Node
                 return true;
         
             var subFSMs = from n in Nodes
-                          where n is SubFSM
+                          where n is SubFSM && n != node
                           select n as SubFSM;
         
             return subFSMs.Any(sub => sub.Intersect(node));

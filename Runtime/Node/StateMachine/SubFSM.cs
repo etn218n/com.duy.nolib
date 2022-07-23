@@ -24,7 +24,12 @@ namespace Nolib.Node
 
         public void OnUpdate() => Update();
         public void OnFixedUpdate() => FixedUpdate();
-        public void OnExit() => nodeStack.Clear();
+        
+        public void OnExit()
+        {
+            nodeStack.Clear();
+            SetCurrentNode(selectorNode);
+        }
 
         public void SetOwner(FSM owner)
         {
