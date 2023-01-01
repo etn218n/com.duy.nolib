@@ -7,78 +7,62 @@ namespace Tests
     public class TestFSM
     {
         [Test]
-        public void AddNode_NotAllowDuplicateNode()
+        public void AddNode_FirstNode_IsEntryNode()
         {
-            var fsm    = new FSM();
-            var stateA = new StateA();
+            var fsm = new FSM();
+            var stateA = new EmptyNode();
+            var stateB = new EmptyNode();
+            
+            fsm.AddTransitionFrom(stateA).To(stateB).When(() => true);
+            fsm.Start();
 
-            fsm.AddNode(stateA);
-            fsm.AddNode(stateA);
-
-            Assert.IsTrue(fsm.NodeCount == 1);
+            Assert.IsTrue(fsm.CurrentNode == stateA);
         }
-
+        
         [Test]
-        public void AddNode_NotAllowIntersectSubFSM()
+        public void Start_WithEntryNode()
         {
-            var fsm    = new FSM();
-            var subFSM = new SubFSM();
-            var stateA = new StateA();
+            var fsm = new FSM();
+            var stateA = new EmptyNode();
+            var stateB = new EmptyNode();
+            var stateC = new EmptyNode();
 
-            subFSM.AddNode(stateA);
+            fsm.AddTransitionFrom(stateA).To(stateB).When(() => true);
+            fsm.AddTransitionFrom(stateB).To(stateC).When(() => true);
+            fsm.Start(stateB);
+            fsm.Tick();
 
-            fsm.AddNode(stateA);
-            fsm.AddNode(subFSM);
-
-            Assert.IsTrue(!fsm.Contains(subFSM));
+            Assert.IsTrue(fsm.CurrentNode == stateC);
         }
-
+        
         [Test]
         public void RemoveNode_FromFSM()
         {
             var fsm    = new FSM();
-            var stateA = new StateA();
-            var stateB = new StateB();
-            var stateC = new StateC();
+            var stateA = new EmptyNode();
+            var stateB = new EmptyNode();
+            var stateC = new EmptyNode();
 
-            fsm.AddTransition(stateA, stateB, () => true);
-            fsm.AddTransition(stateB, stateC, () => true);
-
+            fsm.AddTransitionFrom(stateA).To(stateB).When(() => true);
+            fsm.AddTransitionFrom(stateB).To(stateC).When(() => true);
             fsm.RemoveNode(stateB);
 
             Assert.IsTrue(!fsm.Contains(stateB));
         }
 
         [Test]
-        public void RemoveNode_FromSubFSM()
+        public void RemoveSubFSM_FromFSM_RemoveAllSubNodes()
         {
             var fsm    = new FSM();
-            var subFSM = new SubFSM();
-            var stateA = new StateA();
-            var stateB = new StateB();
-            var stateD = new StateD();
+            var subFSM = new FSM();
+            var stateA = new EmptyNode();
+            var stateB = new EmptyNode();
+            var stateC = new EmptyNode();
+            var stateD = new EmptyNode();
 
-            subFSM.AddNode(stateD);
-            fsm.AddTransition(stateA, stateB, () => true);
-            fsm.AddTransition(stateB, subFSM, () => true);
-            fsm.RemoveNode(stateD);
-
-            Assert.IsTrue(!fsm.Contains(stateD));
-        }
-
-        [Test]
-        public void RemoveSubFSM_FromFSM()
-        {
-            var fsm    = new FSM();
-            var subFSM = new SubFSM();
-            var stateA = new StateA();
-            var stateB = new StateB();
-            var stateC = new StateC();
-            var stateD = new StateD();
-
-            subFSM.AddTransition(stateC, stateD, () => true);
-            fsm.AddTransition(stateA, stateB, () => true);
-            fsm.AddTransition(stateB, subFSM, () => true);
+            subFSM.AddTransitionFrom(stateC).To(stateD).When(() => true);
+            fsm.AddTransitionFrom(stateA).To(stateB).When(() => true);
+            fsm.AddTransitionFrom(stateB).To(subFSM).When(() => true);
             fsm.RemoveNode(subFSM);
 
             Assert.IsTrue(!fsm.Contains(subFSM) && !fsm.Contains(stateC) && !fsm.Contains(stateD));
@@ -89,14 +73,13 @@ namespace Tests
         {
             var n = 0;
             var fsm = new FSM();
-            var stateA = new StateA();
-            var stateB = new StateB();
+            var stateA = new EmptyNode();
+            var stateB = new EmptyNode();
 
-            fsm.AddTransition(stateA, stateB, () => n == 1);
-
+            fsm.AddTransitionFrom(stateA).To(stateB).When(() => n == 1);
             fsm.Start();
             n = 1;
-            fsm.Update();
+            fsm.Tick();
 
             Assert.IsTrue(fsm.CurrentNode == stateB);
         }
@@ -106,19 +89,18 @@ namespace Tests
         {
             var n = 0;
             var fsm = new FSM();
-            var subFSM = new SubFSM();
-            var stateA = new StateA();
-            var stateB = new StateB();
-            var stateC = new StateC();
+            var subFSM = new FSM();
+            var stateA = new EmptyNode();
+            var stateB = new EmptyNode();
+            var stateC = new EmptyNode();
 
-            subFSM.AddTransition(stateB, stateC, () => n == 2);
-            fsm.AddTransition(stateA, subFSM, () => n == 1);
-
+            fsm.AddTransitionFrom(stateA).To(subFSM).When(() => n == 1);
+            subFSM.AddTransitionFrom(stateB).To(stateC).When(() => n == 2);
             fsm.Start();
             n = 1;
-            fsm.Update();
+            fsm.Tick();
             n = 2;
-            fsm.Update();
+            fsm.Tick();
 
             Assert.IsTrue(fsm.CurrentNode == subFSM && subFSM.CurrentNode == stateC);
         }
@@ -126,19 +108,48 @@ namespace Tests
         [Test]
         public void Transition_NodeToNode_WhenUnityEventIsTriggered()
         {
-            var n = 0;
             var fsm = new FSM();
-            var unityEvent = new UnityEvent();
+            var stateA = new EmptyNode();
+            var stateB = new EmptyNode();
+            var stateC = new EmptyNode();
+            var unityEventB = new UnityEvent();
+            var unityEventC = new UnityEvent();
 
-            fsm.AddTransition(new ActionNode {EnterAction = () => n = 1}, 
-                              new ActionNode {EnterAction = () => n = 2},
-                              unityEvent);
-
+            fsm.AddTransitionFrom(stateA).To(stateB).When(unityEventB);
+            fsm.AddTransitionFrom(stateB).To(stateC).When(unityEventC);
             fsm.Start();
-            unityEvent.Invoke();
-            fsm.Update();
+            unityEventB.Invoke();
+            fsm.Tick();
+            unityEventC.Invoke();
+            fsm.Tick();
+            
+            Assert.IsTrue(fsm.CurrentNode == stateC);
+        }
 
-            Assert.IsTrue(n == 2);
+        [Test]
+        public void Transition_SubFSMToSubFSM_WhenPredicateIsTrue()
+        {
+            var n       = 0;
+            var fsm     = new FSM();
+            var subFSMA = new FSM();
+            var subFSMB = new FSM();
+            var stateA  = new EmptyNode();
+            var stateB  = new EmptyNode();
+            var stateC  = new EmptyNode();
+            var stateD  = new EmptyNode();
+            
+            fsm.AddTransitionFrom(stateA).To(subFSMA).When(() => n == 1);
+            subFSMA.AddTransitionFrom(stateB).To(subFSMB).When(() => n == 2);
+            subFSMB.AddTransitionFrom(stateC).To(stateD).When(() => n == 3);
+            fsm.Start();
+            n = 1;
+            fsm.Tick();
+            n = 2;
+            fsm.Tick();
+            n = 3;
+            fsm.Tick();
+            
+            Assert.IsTrue(fsm.CurrentNode == subFSMA && subFSMA.CurrentNode == subFSMB && subFSMB.CurrentNode == stateD);
         }
 
         [Test]
@@ -146,20 +157,60 @@ namespace Tests
         {
             var n = 0;
             var fsm = new FSM();
-            var stateA = new StateA();
-            var stateB = new StateB();
-            var stateC = new StateC();
+            var stateA = new EmptyNode();
+            var stateB = new EmptyNode();
+            var stateC = new EmptyNode();
 
-            fsm.AddTransition(stateA, stateB, () => n == 1);
-            fsm.AddTransitionFromAnyNode(stateC, () => n == 2);
-
+            fsm.AddTransitionFrom(stateA).To(stateB).When(() => n == 1);
+            fsm.AddTransitionFromAnyNode().To(stateC).When(() => n == 2);
             fsm.Start();
             n = 1;
-            fsm.Update();
+            fsm.Tick();
             n = 2;
-            fsm.Update();
+            fsm.Tick();
 
             Assert.IsTrue(fsm.CurrentNode == stateC);
+        }
+        
+        [Test]
+        public void Transition_FromAnyNode_WhenEventIsTriggered()
+        {
+            var fsm = new FSM();
+            var stateA = new EmptyNode();
+            var stateB = new EmptyNode();
+            var stateC = new EmptyNode();
+            var unityEventB = new UnityEvent();
+            var unityEventC = new UnityEvent();
+
+            fsm.AddTransitionFrom(stateA).To(stateB).When(() => true);
+            fsm.AddTransitionFromAnyNode().To(stateC).When(unityEventC);
+            fsm.Start();
+            unityEventB.Invoke();
+            fsm.Tick();
+            unityEventC.Invoke();
+            fsm.Tick();
+            
+            Assert.IsTrue(fsm.CurrentNode == stateC);
+        }
+        
+        [Test]
+        public void Transition_FromAnyNode_ExcludeItself()
+        {
+            var n = 0;
+            var fsm = new FSM();
+            var stateA = new EmptyNode();
+            var stateB = new EmptyNode();
+            var stateC = new ActionNode { EnterAction = () => n = 6 };
+
+            fsm.AddTransitionFrom(stateA).To(stateB).When(() => true);
+            fsm.AddTransitionFromAnyNode().To(stateC).When(() => n == 1);
+            fsm.Start();
+            n = 1;
+            fsm.Tick();
+            n = 1;
+            fsm.Tick();
+
+            Assert.IsTrue(fsm.CurrentNode == stateC && n == 1);
         }
 
         [Test]
@@ -167,21 +218,74 @@ namespace Tests
         {
             var n = 0;
             var fsm = new FSM();
-            var stateA = new StateA();
-            var stateB = new StateB();
-            var stateC = new StateC();
+            var stateA = new EmptyNode();
+            var stateB = new EmptyNode();
 
-            fsm.AddTransition(stateA, stateB, () => n == 1);
-            fsm.AddTransition(stateB, stateC, () => n == 2);
-            fsm.AddTransitionToPreviousNode(stateC, () => n == 3);
-
+            fsm.AddTransitionFrom(stateA).To(stateB).When(() => true);
+            fsm.AddTransitionFrom(stateB).ToPreviousNode().When(() => n == 1);
             fsm.Start();
+            fsm.Tick();
             n = 1;
-            fsm.Update();
-            n = 2;
-            fsm.Update();
-            n = 3;
-            fsm.Update();
+            fsm.Tick();
+
+            Assert.IsTrue(fsm.CurrentNode == stateA);
+        }
+        
+        [Test]
+        public void Transition_ToPreviousNode_WhenEventIsTriggered()
+        {
+            var fsm = new FSM();
+            var stateA = new EmptyNode();
+            var stateB = new EmptyNode();
+            var unityEvent = new UnityEvent();
+
+            fsm.AddTransitionFrom(stateA).To(stateB).When(() => true);
+            fsm.AddTransitionFrom(stateB).ToPreviousNode().When(unityEvent);
+            fsm.Start();
+            fsm.Tick();
+            unityEvent.Invoke();
+            fsm.Tick();
+
+            Assert.IsTrue(fsm.CurrentNode == stateA);
+        }
+        
+        [Test]
+        public void SetCurrentNode_InteruptCurrentNode_And_JumpToSetNode()
+        {
+            var stateName = string.Empty;
+            var conditionValue = 0;
+            var fsm = new FSM();
+            var stateA = new ActionNode { EnterAction = () => stateName = "A" };
+            var stateB = new ActionNode { EnterAction = () => stateName = "B" };
+            var stateC = new ActionNode { EnterAction = () => stateName = "C" };
+
+            fsm.AddTransitionFrom(stateA).To(stateB).When(() => conditionValue == 1);
+            fsm.AddTransitionFrom(stateB).To(stateC).When(() => conditionValue == 2);
+            fsm.Start();
+            conditionValue = 1;
+            fsm.Tick();
+            conditionValue = 2;
+            fsm.Tick();
+            fsm.SetCurrentNode(stateA);
+            fsm.Tick();
+
+            Assert.IsTrue(fsm.CurrentNode == stateA && stateName == "A");
+        }
+        
+        [Test]
+        public void Transition_FromSelectorNode_WhenPredicateIsTrue()
+        {
+            var n = 2;
+            var fsm = new FSM();
+            var stateA = new EmptyNode();
+            var stateB = new EmptyNode();
+            var stateC = new EmptyNode();
+
+            fsm.AddTransitionFromSelectorNode().To(stateA).When(() => n == 1);
+            fsm.AddTransitionFromSelectorNode().To(stateB).When(() => n == 2);
+            fsm.AddTransitionFromSelectorNode().To(stateC).When(() => n == 3);
+            fsm.Start();
+            fsm.Tick();
 
             Assert.IsTrue(fsm.CurrentNode == stateB);
         }

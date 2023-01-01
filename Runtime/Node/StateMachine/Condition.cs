@@ -9,7 +9,7 @@ namespace Nolib.Node
         void Activate();
         void Deactivate();
     }
-    
+
     public class PollCondition : ICondition
     {
         private Func<bool> predicate;
@@ -35,18 +35,35 @@ namespace Nolib.Node
 
         public void Activate()
         {
-            if (unityEvent == null)
-                return;
-
-            isTriggered = false;
             unityEvent.AddListener(OnEventTriggered);
         }
 
         public void Deactivate()
         {
-            if (unityEvent == null)
-                return;
-            
+            isTriggered = false;
+            unityEvent.RemoveListener(OnEventTriggered);
+        }
+    }
+    
+    public class UnityEventCondition<T> : ICondition
+    {
+        private UnityEvent<T> unityEvent;
+        private bool isTriggered;
+
+        public UnityEventCondition(UnityEvent<T> unityEvent) => this.unityEvent = unityEvent;
+
+        private void OnEventTriggered(T value) => isTriggered = true;
+
+        public bool IsTrue() => isTriggered;
+
+        public void Activate()
+        {
+            unityEvent.AddListener(OnEventTriggered);
+        }
+
+        public void Deactivate()
+        {
+            isTriggered = false;
             unityEvent.RemoveListener(OnEventTriggered);
         }
     }

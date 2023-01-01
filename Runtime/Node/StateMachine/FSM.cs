@@ -1,174 +1,181 @@
 using System;
 using System.Linq;
 using System.Collections.Generic;
-using Nolib.DataStructure;
 using UnityEngine;
 using UnityEngine.Events;
+using Nolib.DataStructure;
 
 namespace Nolib.Node
 {
-    public class FSM
+    public class FSM : Node
     {
+        #region Fields & Properties
         protected readonly string name;
-        protected readonly CircularBuffer<INode> nodeStack;
-        protected readonly List<INode> nodesPointedByEveryNode;
-        protected readonly Dictionary<INode, List<Transition>> transitionMap;
+        protected readonly CircularBuffer<Node> nodeStack;
+        protected readonly Dictionary<Node, List<ITransition>> transitionMap;
+        protected readonly Dictionary<Node, List<ITransition>> anyNodeTransitionMap;
 
-        protected INode selectorNode;
-        protected INode exitNode;
-        protected INode currentNode;
-        protected INode traceBackNode;
+        protected Node selectorNode;
+        protected Node exitNode;
+        protected Node currentNode;
+        protected Node traceBackNode;
         
-        protected List<Transition> currentTransitionSet;
-        protected int maxNodeStackSize;
+        protected bool isCompleted;
+        protected int maxStackSize;
+        protected List<ITransition> currentTransitionSet;
 
         public string Name => name;
-        public int NodeCount => transitionMap.Keys.Count - 1;
-        public int MaxNodeStackSize => maxNodeStackSize;
-        public INode CurrentNode => currentNode;
-        public IReadOnlyCollection<INode> Nodes => transitionMap.Keys;
-        public IReadOnlyCollection<Transition> CurrentTransitionSet => currentTransitionSet;
-        public IReadOnlyCollection<Transition> TransitionsFrom(INode node) => transitionMap[node];
+        public int StateCount => transitionMap.Keys.Count - 1;
+        public int MaxStackSize => maxStackSize;
+        public bool IsCompleted => isCompleted;
+        public Node CurrentNode => currentNode;
+        public IReadOnlyCollection<Node> Nodes => transitionMap.Keys;
+        public IReadOnlyCollection<ITransition> CurrentTransitionSet => currentTransitionSet;
+        public IReadOnlyCollection<ITransition> TransitionsFrom(Node node) => transitionMap[node];
 
-        public FSM(string name = "FSM", int maxNodeStackSize = 20)
+        public FSM(string name = "FSM", int maxStackSize = 20)
         {
             this.name = name;
-            this.maxNodeStackSize = maxNodeStackSize;
+            this.maxStackSize = maxStackSize;
             
-            nodeStack = new CircularBuffer<INode>(maxNodeStackSize);
-            transitionMap = new Dictionary<INode, List<Transition>>();
-            currentTransitionSet = new List<Transition>();
-            nodesPointedByEveryNode = new List<INode>();
+            nodeStack = new CircularBuffer<Node>(maxStackSize);
+            transitionMap = new Dictionary<Node, List<ITransition>>();
+            anyNodeTransitionMap = new Dictionary<Node, List<ITransition>>();
+            currentTransitionSet = new List<ITransition>();
             
-            selectorNode  = new EmptyNode(); 
-            exitNode      = new EmptyNode(); 
-            currentNode   = new EmptyNode();
+            selectorNode  = new EmptyNode();
             traceBackNode = new EmptyNode();
+            exitNode      = new ActionNode { EnterAction = () => isCompleted = true };
+            currentNode   = selectorNode;
             
-            transitionMap.Add(selectorNode, new List<Transition>());
-            SetCurrentNode(selectorNode);
+            AddNode(selectorNode);
+            TransitionToNode(selectorNode);
         }
+        #endregion
 
-        public void Start()
+        #region Run FSM
+        public void Start(Node entryNode = null)
         {
+            isCompleted = false;
+
+            if (entryNode != null && transitionMap.ContainsKey(entryNode))
+                SetEntryNode(entryNode);
+            
             var qualifiedTransition = CheckForQualifiedTransition(transitionMap[selectorNode]);
 
             if (qualifiedTransition != null)
-                SetCurrentNode(qualifiedTransition.Destination);
-            else
-                Debug.Log($"{name}: does not have any node to start with.");
-            
-            currentNode.OnEnter();
+                TransitionToNode(qualifiedTransition.Destination);
         }
 
-        public void Update()
+        public NodeStatus Tick()
         {
             var qualifiedTransition = CheckForQualifiedTransition(currentTransitionSet);
             
             if (qualifiedTransition != null)
             {
-                currentNode.OnExit();
-                
                 if (qualifiedTransition.Destination == traceBackNode && nodeStack.Count >= 2)
                 {
                     nodeStack.PopTail();
-                    qualifiedTransition = new Transition(qualifiedTransition.Source, nodeStack.PopTail(), qualifiedTransition.Condition);
+                    TransitionToNode(nodeStack.PopTail());
                 }
-                
-                SetCurrentNode(qualifiedTransition.Destination);
-                currentNode.OnEnter();
-                return;
+                else
+                {
+                    TransitionToNode(qualifiedTransition.Destination);
+                }
             }
             
-            currentNode.OnUpdate();
+            currentNode.OnTick();
+            
+            return NodeStatus.Running;
         }
 
-        public void FixedUpdate()
+        public void Update() => currentNode.OnUpdate();
+        public void FixedUpdate() => currentNode.OnFixedUpdate();
+        #endregion
+
+        #region Node Callbacks
+        protected internal override void OnEnter() => Start();
+        protected internal override NodeStatus OnTick() => Tick();
+        protected internal override void OnUpdate() => Update();
+        protected internal override void OnFixedUpdate() => FixedUpdate();
+        protected internal override void OnExit()
         {
-            currentNode.OnFixedUpdate();
+            nodeStack.Clear();
+            TransitionToNode(selectorNode);
         }
+        #endregion
 
-        public bool Contains(INode node)
+        #region Node Operations
+        public bool Contains(Node node)
         {
             if (transitionMap.ContainsKey(node))
                 return true;
             
             var subFSMs = from n in Nodes
-                          where n is SubFSM
-                          select n as SubFSM;
+                          where n is FSM
+                          select n as FSM;
 
             return subFSMs.Any(sub => sub.Contains(node));
         }
-        
-        public bool Intersect(INode node)
-        {
-            if (transitionMap.ContainsKey(node))
-                return true;
 
-            return IntersectWithAnySubFSM(node);
-        }
-        
-        public bool IntersectWithAnySubFSM(INode node)
+        protected void AddNode(Node node)
         {
-            if (node is SubFSM subFSM && subFSM.Nodes.Intersect(Nodes).Any())
-                return true;
-        
-            var subFSMs = from n in Nodes
-                          where n is SubFSM && n != node
-                          select n as SubFSM;
-        
-            return subFSMs.Any(sub => sub.Intersect(node));
-        }
-
-        public void AddNode(INode node)
-        {
-            if (!IsValidNode(node))
-                return;
-
-            // Handle first node
+            if (!node.IsChildOf(this))
+                node.Attach(this);
+            
             if (transitionMap.Count == 1)
-                transitionMap[selectorNode].Add(new Transition(selectorNode, node, () => true));
+                SetEntryNode(node);
             
             if (!transitionMap.ContainsKey(node))
-                transitionMap.Add(node, new List<Transition>());
-            
-            if (node is SubFSM subFSM)
-                subFSM.SetOwner(this);
+                transitionMap.Add(node, new List<ITransition>());
+        }
+        
+        protected void SetEntryNode(Node node)
+        {
+            // override all transitions from Selector node
+            transitionMap[selectorNode].Clear();
+            transitionMap[selectorNode].Add(new Transition(selectorNode, node, () => true));
         }
 
-        public void RemoveNode(INode node)
+        public void RemoveNode(Node node)
         {
-            if (Nodes.Contains(node))
+            var foundNode = Nodes.FirstOrDefault(s => s == node);
+
+            if (foundNode != null && foundNode != currentNode)
             {
+                foundNode.Detach(this);
                 transitionMap.Remove(node);
                 
-                if (nodesPointedByEveryNode.Contains(node))
-                    nodesPointedByEveryNode.Remove(node);
+                if (anyNodeTransitionMap.ContainsKey(node))
+                    anyNodeTransitionMap.Remove(node);
 
                 foreach (var n in transitionMap.Keys)
                 {
-                    var relatedTransitions = from t in transitionMap[n] 
-                                             where t.Destination == node 
-                                             select t;
+                    var relatedTransitions = from transition in transitionMap[n] 
+                                             where transition.Destination == node 
+                                             select transition;
 
                     foreach (var transition in relatedTransitions.ToList())
                         transitionMap[n].Remove(transition);
                 }
                 
                 // TODO: remove node from node stack also
-                // TODO: resolve scenario where current node is the node the remove
-            }
-            else
-            {
-                var subFSMs = from n in Nodes
-                              where n is SubFSM
-                              select n as SubFSM;
-                
-                subFSMs.ToList().ForEach(sub => sub.RemoveNode(node));
             }
         }
 
-        public void AddTransition(INode source, INode destination, Func<bool> predicate)
+        public void SetCurrentNode(Node node)
+        {
+            if (!Contains(node))
+                return;
+            
+            TransitionToNode(node);
+        }
+
+        public RegularSourceNode AddTransitionFrom(Node source) => new RegularSourceNode(this, source);
+        public AnyNode AddTransitionFromAnyNode() => new AnyNode(this);
+        public SelectorNode AddTransitionFromSelectorNode() => new SelectorNode(this);
+
+        protected internal void AddTransition(Node source, Node destination, Func<bool> predicate)
         {
             if (!IsValidNode(source) || !IsValidNode(destination))
                 return;
@@ -178,7 +185,7 @@ namespace Nolib.Node
             RegisterTransition(new Transition(source, destination, predicate));
         }
 
-        public void AddTransition(INode source, INode destination, UnityEvent unityEvent)
+        protected internal void AddTransition(Node source, Node destination, UnityEvent unityEvent)
         {
             if (!IsValidNode(source) || !IsValidNode(destination))
                 return;
@@ -188,111 +195,138 @@ namespace Nolib.Node
             RegisterTransition(new Transition(source, destination, unityEvent));
         }
         
-        public void AddTransitionFromAnyNode(INode destination, Func<bool> predicate)
+        protected internal void AddTransition<T>(Node source, Node destination, UnityEvent<T> unityEvent)
         {
-            if (nodesPointedByEveryNode.Contains(destination))
+            if (!IsValidNode(source) || !IsValidNode(destination))
+                return;
+            
+            AddNode(source);
+            AddNode(destination);
+            RegisterTransition(new Transition<T>(source, destination, unityEvent));
+        }
+        
+        protected internal void AddTransitionFromAnyNode(Node destination, Func<bool> predicate)
+        {
+            if (!IsValidNode(destination))
                 return;
 
             AddNode(destination);
             RegisterAnyNodeTransition(destination, new PollCondition(predicate));
         }
 
-        public void AddTransitionFromAnyNode(INode destination, UnityEvent unityEvent)
+        protected internal void AddTransitionFromAnyNode(Node destination, UnityEvent unityEvent)
         {
-            if (nodesPointedByEveryNode.Contains(destination))
+            if (!IsValidNode(destination))
                 return;
 
             AddNode(destination);
             RegisterAnyNodeTransition(destination, new UnityEventCondition(unityEvent));
         }
+        
+        protected internal void AddTransitionFromAnyNode<T>(Node destination, UnityEvent<T> unityEvent)
+        {
+            if (!IsValidNode(destination))
+                return;
 
-        public void AddTransitionToPreviousNode(INode source, Func<bool> predicate)
-        {
-            AddTransition(source, traceBackNode, predicate);
-        }
-        
-        public void AddTransitionToPreviousNode(INode source, UnityEvent unityEvent)
-        {
-            AddTransition(source, traceBackNode, unityEvent);
-        }
-        
-        public void AddTransitionToExitNode(INode source, Func<bool> predicate)
-        {
-            AddTransition(source, exitNode, predicate);
-        }
-        
-        public void AddTransitionToExitNode(INode source, UnityEvent unityEvent)
-        {
-            AddTransition(source, exitNode, unityEvent);
+            AddNode(destination);
+            RegisterAnyNodeTransition(destination, new UnityEventCondition<T>(unityEvent));
         }
 
-        public void AddTransitionFromSelectorNode(INode destination, Func<bool> predicate)
-        {
-            AddTransition(selectorNode, destination, predicate);
-        }
-        
-        public void AddTransitionFromSelectorNode(INode destination, UnityEvent unityEvent)
-        {
-            AddTransition(selectorNode, destination, unityEvent);
-        }
+        protected internal void AddTransitionToPreviousNode(Node source, Func<bool> predicate) => AddTransition(source, traceBackNode, predicate);
+        protected internal void AddTransitionToPreviousNode(Node source, UnityEvent unityEvent) => AddTransition(source, traceBackNode, unityEvent);
+        protected internal void AddTransitionToPreviousNode<T>(Node source, UnityEvent<T> unityEvent) => AddTransition(source, traceBackNode, unityEvent);
 
-        protected void RegisterTransition(Transition transition)
-        {
-            var source = transition.Source;
+        protected internal void AddTransitionToExitNode(Node source, Func<bool> predicate) => AddTransition(source, exitNode, predicate);
+        protected internal void AddTransitionToExitNode(Node source, UnityEvent unityEvent) => AddTransition(source, exitNode, unityEvent);
+        protected internal void AddTransitionToExitNode<T>(Node source, UnityEvent<T> unityEvent) => AddTransition(source, exitNode, unityEvent);
 
-            transitionMap[source].Add(transition);
+        protected internal void AddTransitionFromSelectorNode(Node destination, Func<bool> predicate) => AddTransition(selectorNode, destination, predicate);
+        protected internal void AddTransitionFromSelectorNode(Node destination, UnityEvent unityEvent) => AddTransition(selectorNode, destination, unityEvent);
+        protected internal void AddTransitionFromSelectorNode<T>(Node destination, UnityEvent<T> unityEvent) => AddTransition(selectorNode, destination, unityEvent);
+        #endregion
+
+        #region Transition Operations
+        protected void RegisterTransition(ITransition transition)
+        {
+            if (transition.Source == selectorNode)
+            {
+                transitionMap[selectorNode].Insert(0, transition);
+                return;
+            }
             
-            foreach (var node in nodesPointedByEveryNode.Where(node => node != selectorNode))
-                transitionMap[source].Insert(0, new Transition(source, node, transition.Condition));
+            transitionMap[transition.Source].Add(transition);
         }
         
-        protected void RegisterAnyNodeTransition(INode destination, ICondition condition)
+        protected void RegisterAnyNodeTransition(Node destination, ICondition condition)
         {
-            nodesPointedByEveryNode.Add(destination);
+            if (!anyNodeTransitionMap.ContainsKey(destination))
+                anyNodeTransitionMap.Add(destination, new List<ITransition>());
 
-            foreach (var node in Nodes.Where(node => node != destination && node != selectorNode))
-                transitionMap[node].Insert(0, new Transition(node, destination, condition));
+            anyNodeTransitionMap[destination].Add(new Transition(null, destination, condition));
         }
         
-        protected Transition CheckForQualifiedTransition(List<Transition> transitionSet)
+        protected ITransition CheckForQualifiedTransition(List<ITransition> transitionSet)
         {
+            foreach (var destinationNode in anyNodeTransitionMap.Keys)
+            {
+                if (destinationNode == currentNode)
+                    continue;
+                
+                foreach (var transition in anyNodeTransitionMap[destinationNode])
+                {
+                    if (transition.Condition.IsTrue())
+                        return transition;
+                }
+            }
+
             foreach (var transition in transitionSet)
             {
-                if (transition.Condition.IsTrue() && transition.Destination != currentNode)
+                if (transition.Condition.IsTrue())
                     return transition;
-            } 
+            }
             
             return null;
         }
         
-        protected void SetCurrentNode(INode node)
+        protected void TransitionToNode(Node node)
         {
-            if (transitionMap.ContainsKey(currentNode))
-            {
-                foreach (var transition in transitionMap[node])
-                    transition.DeactivateCondition();
-            }
+            currentNode.OnExit();
+            DeactivateConditions(currentNode);
+            currentNode = node;
+            ActivateConditions(currentNode);
+            currentNode.OnEnter();
             
-            currentNode  = node;
             nodeStack.PushTail(currentNode);
             currentTransitionSet = transitionMap[currentNode];
+        }
+
+        protected void ActivateConditions(Node node)
+        {
+            foreach (var destinationNode in anyNodeTransitionMap.Keys)
+            {
+                foreach (var transition in anyNodeTransitionMap[destinationNode])
+                    transition.ActivateCondition();
+            }
             
-            foreach (var transition in transitionMap[currentNode])
+            foreach (var transition in transitionMap[node])
                 transition.ActivateCondition();
         }
         
-        public void SetEntry(INode node)
+        protected void DeactivateConditions(Node node)
         {
-            if (!transitionMap.ContainsKey(node))
+            foreach (var destinationNode in anyNodeTransitionMap.Keys)
             {
-                Debug.Log($"{name}: entry node must be contained in this FSM.");
-                return;
+                foreach (var transition in anyNodeTransitionMap[destinationNode])
+                    transition.DeactivateCondition();
             }
             
-            transitionMap[selectorNode].Insert(0, new Transition(selectorNode, node, () => true));
+            foreach (var transition in transitionMap[node])
+                transition.DeactivateCondition();
         }
-
-        public virtual bool IsValidNode(INode node)
+        #endregion
+        
+        #region Validations
+        protected bool IsValidNode(Node node)
         {
             if (node == null)
             {
@@ -300,13 +334,20 @@ namespace Nolib.Node
                 return false;
             }
 
-            if (IntersectWithAnySubFSM(node))
+            if (node == this)
             {
-                Debug.Log($"{name}: already contained this node.");
+                Debug.Log($"{name}: can not add itself.");
+                return false;
+            }
+
+            if (node.HasParent && !node.IsChildOf(this))
+            {
+                Debug.Log($"{name}: node is already owned by other node.");
                 return false;
             }
 
             return true;
         }
+        #endregion
     }
 }
