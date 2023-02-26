@@ -91,6 +91,8 @@ namespace Nolib.Node
 
         public void Update() => currentNode.OnUpdate();
         public void FixedUpdate() => currentNode.OnFixedUpdate();
+        public void LateUpdate() => currentNode.OnLateUpdate();
+        public void ProcessInput() => currentNode.OnProcessInput();
         #endregion
 
         #region Node Callbacks

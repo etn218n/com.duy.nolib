@@ -1,10 +1,10 @@
 {
   "name": "com.duy.nolib",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "displayName": "Nolib",
   "description": "General purpose library in Unity",
-  "unity": "2021.3",
-  "unityRelease": "5f1",
+  "unity": "2022.2",
+  "unityRelease": "4f1",
   "documentationUrl": "",
   "changelogUrl": "",
   "licensesUrl": "",
