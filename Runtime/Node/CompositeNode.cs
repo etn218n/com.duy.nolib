@@ -51,9 +51,9 @@ namespace Nolib.Node
             OnEnter();
         }
 
-        public NodeStatus Tick()
+        public NodeStatus Tick(float deltaTime = 0)
         {
-            return OnTick();
+            return OnTick(deltaTime);
         }
 
         public void Update()

@@ -67,7 +67,7 @@ namespace Nolib.Node
                 TransitionToNode(qualifiedTransition.Destination);
         }
 
-        public NodeStatus Tick()
+        public NodeStatus Tick(float deltaTime = 0)
         {
             var qualifiedTransition = CheckForQualifiedTransition(currentTransitionSet);
             
@@ -84,20 +84,23 @@ namespace Nolib.Node
                 }
             }
             
-            currentNode.OnTick();
+            currentNode.OnTick(deltaTime);
             
             return NodeStatus.Running;
         }
 
+        public void PreTick(float deltaTime) => currentNode.OnPreTick(deltaTime);
+        public void PostTick(float deltaTime) => currentNode.OnPostTick(deltaTime);
         public void Update() => currentNode.OnUpdate();
         public void FixedUpdate() => currentNode.OnFixedUpdate();
         public void LateUpdate() => currentNode.OnLateUpdate();
-        public void ProcessInput() => currentNode.OnProcessInput();
         #endregion
 
         #region Node Callbacks
+        protected internal override NodeStatus OnTick(float deltaTime = 0) => Tick(deltaTime);
+        protected internal override void OnPreTick(float deltaTime = 0) => PreTick(deltaTime);
+        protected internal override void OnPostTick(float deltaTime = 0) => PostTick(deltaTime);
         protected internal override void OnEnter() => Start();
-        protected internal override NodeStatus OnTick() => Tick();
         protected internal override void OnUpdate() => Update();
         protected internal override void OnFixedUpdate() => FixedUpdate();
         protected internal override void OnExit()

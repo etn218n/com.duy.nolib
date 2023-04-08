@@ -38,8 +38,9 @@ namespace Nolib.Node
         protected internal virtual void OnUpdate() { }
         protected internal virtual void OnFixedUpdate() { }
         protected internal virtual void OnLateUpdate() { }
-        protected internal virtual void OnProcessInput() { }
         protected internal virtual void OnExit() { }
-        protected internal virtual NodeStatus OnTick() { return  NodeStatus.Failure; }
+        protected internal virtual void OnPreTick(float deltaTime = 0) { }
+        protected internal virtual NodeStatus OnTick(float deltaTime = 0) { return  NodeStatus.Failure; }
+        protected internal virtual void OnPostTick(float deltaTime = 0) { }
     }
 }

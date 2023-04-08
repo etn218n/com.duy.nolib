@@ -29,7 +29,7 @@ namespace Nolib.Node
             statuses.RemoveAt(children.IndexOf(node));
         }
 
-        protected internal override NodeStatus OnTick()
+        protected internal override NodeStatus OnTick(float deltaTime)
         {
             if (!isConditionMet)
                 return NodeStatus.Failure;
@@ -39,7 +39,7 @@ namespace Nolib.Node
                 if (statuses[i] != NodeStatus.Running)
                     children[i].OnEnter();
 
-                statuses[i] = children[i].OnTick();
+                statuses[i] = children[i].OnTick(deltaTime);
             }
 
             var shouldTerminate = EvaluateTerminationPolicy();

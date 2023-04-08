@@ -17,7 +17,7 @@ namespace Nolib.Node
             currentStatus = NodeStatus.Failure;
         }
 
-        protected internal override NodeStatus OnTick()
+        protected internal override NodeStatus OnTick(float deltaTime)
         {
             if (!isConditionMet)
                 return NodeStatus.Failure;
@@ -27,7 +27,7 @@ namespace Nolib.Node
                 if (currentStatus != NodeStatus.Running)
                     children[currentIndex].OnEnter();
 
-                currentStatus = children[currentIndex].OnTick();
+                currentStatus = children[currentIndex].OnTick(deltaTime);
 
                 switch (currentStatus)
                 {
