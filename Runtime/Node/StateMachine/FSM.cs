@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Collections.Generic;
 using UnityEngine;
@@ -94,6 +94,7 @@ namespace Nolib.Node
         public void Update() => currentNode.OnUpdate();
         public void FixedUpdate() => currentNode.OnFixedUpdate();
         public void LateUpdate() => currentNode.OnLateUpdate();
+        public void AnimatorMove() => currentNode.OnAnimatorMove();
         #endregion
 
         #region Node Callbacks
@@ -103,6 +104,9 @@ namespace Nolib.Node
         protected internal override void OnEnter() => Start();
         protected internal override void OnUpdate() => Update();
         protected internal override void OnFixedUpdate() => FixedUpdate();
+        protected internal override void OnLateUpdate() => LateUpdate();
+        protected internal override void OnAnimatorMove() => AnimatorMove();
+        
         protected internal override void OnExit()
         {
             nodeStack.Clear();

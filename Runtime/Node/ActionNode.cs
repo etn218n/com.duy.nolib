@@ -7,8 +7,9 @@ namespace Nolib.Node
         public Action EnterAction  = () => { };
         public Action ExitAction   = () => { };
         public Action UpdateAction = () => { };
-        public Action FixedUpdateAction = () => { };
-        public Action LateUpdateAction  = () => { };
+        public Action FixedUpdateAction  = () => { };
+        public Action LateUpdateAction   = () => { };
+        public Action AnimatorMoveAction = () => { };
 
         public Func<float, NodeStatus> TickAction = deltaTime => NodeStatus.Failure;
         public Action<float> PreTickAction  = deltaTime => { };
@@ -19,6 +20,7 @@ namespace Nolib.Node
         protected internal override void OnUpdate() => UpdateAction();
         protected internal override void OnFixedUpdate() => FixedUpdateAction();
         protected internal override void OnLateUpdate() => LateUpdateAction();
+        protected internal override void OnAnimatorMove() => AnimatorMoveAction();
         protected internal override NodeStatus OnTick(float deltaTime = 0) => TickAction(deltaTime);
         protected internal override void OnPreTick(float deltaTime = 0) => PreTickAction(deltaTime);
         protected internal override void OnPostTick(float deltaTime = 0) => PostTickAction(deltaTime);
@@ -31,8 +33,9 @@ namespace Nolib.Node
         public Action<T> EnterAction  = context => { };
         public Action<T> ExitAction   = context => { };
         public Action<T> UpdateAction = context => { };
-        public Action<T> FixedUpdateAction = context => { };
-        public Action<T> LateUpdateAction  = context => { };
+        public Action<T> FixedUpdateAction  = context => { };
+        public Action<T> LateUpdateAction   = context => { };
+        public Action<T> AnimatorMoveAction = context => { };
         public Func<T, float, NodeStatus> TickAction = (context, deltaTime) => NodeStatus.Failure;
         public Action<T, float> PreTickAction  = (context, deltaTime) => { };
         public Action<T, float> PostTickAction = (context, deltaTime) => { };
@@ -44,6 +47,7 @@ namespace Nolib.Node
         protected internal override void OnUpdate() => UpdateAction(context);
         protected internal override void OnFixedUpdate() => FixedUpdateAction(context);
         protected internal override void OnLateUpdate() => LateUpdateAction(context);
+        protected internal override void OnAnimatorMove() => AnimatorMoveAction(context);
         protected internal override NodeStatus OnTick(float deltaTime = 0) => TickAction(context, deltaTime);
         protected internal override void OnPreTick(float deltaTime = 0) => PreTickAction(context, deltaTime);
         protected internal override void OnPostTick(float deltaTime = 0) => PostTickAction(context, deltaTime);

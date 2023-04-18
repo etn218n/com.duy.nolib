@@ -55,6 +55,16 @@ namespace Nolib.Node
         {
             return OnTick(deltaTime);
         }
+        
+        public void PreTick(float deltaTime = 0)
+        {
+            OnPreTick(deltaTime);
+        }
+        
+        public void PostTick(float deltaTime = 0)
+        {
+            OnPostTick(deltaTime);
+        }
 
         public void Update()
         {
@@ -64,6 +74,16 @@ namespace Nolib.Node
         public void FixedUpdate()
         {
             OnFixedUpdate();
+        }
+        
+        public void LateUpdate()
+        {
+            OnLateUpdate();
+        }
+        
+        public void AnimatorMove()
+        {
+            OnAnimatorMove();
         }
         
         protected internal override void OnEnter()
